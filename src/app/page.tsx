@@ -13,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const coin = payload?.coin;
   const tokenName = coin?.name ?? "Token";
   const baseUrl = getBaseUrl();
-  const ogUrl = payload && baseUrl && coin ? `${baseUrl}/api/og?id=${encodeURIComponent(coin.id)}&days=30` : undefined;
+  const ogUrl = payload?.ogImageBase64;
 
   // Build CAIP-19 for Base (chainId 8453) using ERC20 contract address when available
   let caip19Token: string | undefined;
@@ -65,24 +65,24 @@ export default async function Home() {
   const payload = await getOrRefreshRandomCoinPayload();
   const coin = payload?.coin;
   const tokenName = coin?.name ?? "Token";
-  const ogPath = payload && coin ? `/api/og?id=${encodeURIComponent(coin.id)}&days=30` : null;
+  const ogImageBase64 = payload?.ogImageBase64;
   const baseUrl = getBaseUrl();
   const embedUrl = baseUrl || null;
   const shareText = "Swap a random token in the feed!";
   const shareUrl = embedUrl
-    ? `https://warpcast.com/~/compose?text=${encodeURIComponent(shareText)}&embeds[]=${encodeURIComponent(embedUrl)}`
+    ? `https://farcaster.xyz/~/compose?text=${encodeURIComponent(shareText)}&embeds[]=${encodeURIComponent(embedUrl)}`
     : null;
 
   return (
     <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
       <main className="flex flex-col gap-[24px] row-start-2 items-center sm:items-start w-full max-w-[1200px]">
-        {ogPath ? (
-          // Use a plain img tag for dynamic route rendering without domain config
+        {ogImageBase64 ? (
+          // Use base64 image directly - no separate route needed
           <img
-            src={ogPath}
+            src={ogImageBase64}
             alt={`Price chart OG image for ${tokenName}`}
             width={1200}
-            height={630}
+            height={800}
             style={{ width: "100%", height: "auto", borderRadius: 16, border: "1px solid rgba(255,255,255,0.08)" }}
           />
         ) : (

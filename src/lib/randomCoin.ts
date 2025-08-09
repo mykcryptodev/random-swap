@@ -36,11 +36,12 @@ export type RandomCoinPayload = {
   coin: CoinGeckoCoin;
   details: CoinDetails;
   chart: MarketChart;
+  ogImageBase64: string;
 };
 
 export async function getOrRefreshRandomCoinPayload(): Promise<RandomCoinPayload | null> {
   // Single cache key for the entire payload
-  const MAIN_KEY = "random-coin-complete-v2";
+  const MAIN_KEY = "random-coin-complete-v3";
   
   // Step 1: Check if we have a cached payload
   const cached = await getJSON<RandomCoinPayload>(MAIN_KEY);
@@ -76,6 +77,7 @@ export async function getOrRefreshRandomCoinPayload(): Promise<RandomCoinPayload
     const coins = await fetchCoinsByCategory(RANDOM_COIN_CATEGORY, apiKey);
     const coin = pickRandomCoin(coins);
     if (!coin) {
+      console.error("No coin picked from category");
       return null;
     }
 
@@ -84,13 +86,24 @@ export async function getOrRefreshRandomCoinPayload(): Promise<RandomCoinPayload
       fetchCoinMarketChart(coin.id, RANDOM_COIN_CHART_DAYS, apiKey),
     ]);
 
-    const payload: RandomCoinPayload = { coin, details, chart };
+    // Generate the OG image as base64
+    const { generateOgImageBase64 } = await import("@/lib/generateOgImage");
+    const origin = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || "http://localhost:3000";
+    const fullOrigin = origin.startsWith("http") ? origin : `https://${origin}`;
+    const ogImageBase64 = await generateOgImageBase64(details, chart, RANDOM_COIN_CHART_DAYS, fullOrigin);
+
+    const payload: RandomCoinPayload = { coin, details, chart, ogImageBase64 };
     
     // Step 4: Store the payload with TTL (use regular set, not NX)
     const client = getRedisClient();
-    await client.set(MAIN_KEY, JSON.stringify(payload), { ex: RANDOM_COIN_CACHE_TTL_SECONDS });
+    // Upstash Redis can handle objects directly
+    await client.set(MAIN_KEY, payload, { ex: RANDOM_COIN_CACHE_TTL_SECONDS });
     
+    console.log(`Cached new payload for ${coin.name}, image length: ${ogImageBase64.length}`);
     return payload;
+  } catch (error) {
+    console.error("Error fetching/generating payload:", error);
+    throw error;
   } finally {
     // Always release the lock (it will auto-expire anyway)
   }

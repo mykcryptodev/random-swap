@@ -23,18 +23,15 @@ export function getRedisClient(): Redis {
 
 export async function setWithTTL<T>(key: string, value: T, ttlSeconds: number): Promise<void> {
   const client = getRedisClient();
-  await client.set(key, JSON.stringify(value), { ex: ttlSeconds });
+  // Upstash Redis can handle objects directly
+  await client.set(key, value, { ex: ttlSeconds });
 }
 
 export async function getJSON<T>(key: string): Promise<T | null> {
   const client = getRedisClient();
-  const raw = await client.get<string | null>(key);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
-  }
+  // Upstash Redis automatically handles JSON serialization/deserialization
+  const data = await client.get<T>(key);
+  return data;
 }
 
 export async function setWithTTLIfNotExists<T>(
@@ -43,7 +40,8 @@ export async function setWithTTLIfNotExists<T>(
   ttlSeconds: number
 ): Promise<boolean> {
   const client = getRedisClient();
-  const res = await client.set(key, JSON.stringify(value), { ex: ttlSeconds, nx: true });
+  // Upstash Redis can handle objects directly
+  const res = await client.set(key, value, { ex: ttlSeconds, nx: true });
   return res === "OK";
 }
 
