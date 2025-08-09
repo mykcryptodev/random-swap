@@ -13,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const coin = payload?.coin;
   const tokenName = coin?.name ?? "Token";
   const baseUrl = getBaseUrl();
-  const ogUrl = payload && baseUrl ? `${baseUrl}/api/og?id=__cached__&days=7` : undefined;
+  const ogUrl = payload && baseUrl && coin ? `${baseUrl}/api/og?id=${encodeURIComponent(coin.id)}&days=30` : undefined;
 
   // Build CAIP-19 for Base (chainId 8453) using ERC20 contract address when available
   let caip19Token: string | undefined;
@@ -65,7 +65,7 @@ export default async function Home() {
   const payload = await getOrRefreshRandomCoinPayload();
   const coin = payload?.coin;
   const tokenName = coin?.name ?? "Token";
-  const ogPath = payload ? `/api/og?id=__cached__&days=30` : null;
+  const ogPath = payload && coin ? `/api/og?id=${encodeURIComponent(coin.id)}&days=30` : null;
   const baseUrl = getBaseUrl();
   const embedUrl = baseUrl || null;
   const shareText = "Swap a random token in the feed!";
