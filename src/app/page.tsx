@@ -1,6 +1,7 @@
 import Image from "next/image";
 import type { Metadata } from "next";
 import { getOrRefreshRandomCoinPayload } from "@/lib/randomCoin";
+import { RANDOM_COIN_CACHE_TTL_SECONDS } from "@/lib/cache";
 
 function getBaseUrl(): string {
   const raw = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || "";
@@ -13,8 +14,9 @@ export async function generateMetadata(): Promise<Metadata> {
   const coin = payload?.coin;
   const tokenName = coin?.name ?? "Token";
   const baseUrl = getBaseUrl();
-  // Use the frame-image endpoint URL for Farcaster (it requires a real URL, not base64)
-  const ogUrl = baseUrl ? `${baseUrl}/api/frame-image` : undefined;
+  // Add cache busting with coin ID and timestamp to prevent stale images
+  const cacheBuster = coin ? `${coin.id}` : 'default';
+  const ogUrl = baseUrl ? `${baseUrl}/api/frame-image?v=${cacheBuster}` : undefined;
 
   // Build CAIP-19 for Base (chainId 8453) using ERC20 contract address when available
   let caip19Token: string | undefined;

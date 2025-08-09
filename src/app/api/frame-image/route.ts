@@ -21,7 +21,9 @@ export async function GET() {
       status: 200,
       headers: {
         "Content-Type": "image/png",
-        "Cache-Control": `public, max-age=${RANDOM_COIN_CACHE_TTL_SECONDS / 2}`, // Cache for 30 seconds
+        "Cache-Control": `public, s-maxage=${RANDOM_COIN_CACHE_TTL_SECONDS / 2}, max-age=${RANDOM_COIN_CACHE_TTL_SECONDS / 2}, stale-while-revalidate=0`,
+        "CDN-Cache-Control": `max-age=${RANDOM_COIN_CACHE_TTL_SECONDS / 2}`,
+        "Vercel-CDN-Cache-Control": `max-age=${RANDOM_COIN_CACHE_TTL_SECONDS / 2}`,
       },
     });
   } catch (error) {
