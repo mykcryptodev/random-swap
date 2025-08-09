@@ -16,6 +16,27 @@ function formatUsd(n?: number): string {
   }
 }
 
+function formatUsdAbbrev(n?: number): string {
+  if (n == null) return "-";
+  const abs = Math.abs(n);
+  const units = [
+    { v: 1e12, s: "T" },
+    { v: 1e9, s: "B" },
+    { v: 1e6, s: "M" },
+    { v: 1e3, s: "K" },
+  ];
+  for (const { v, s } of units) {
+    if (abs >= v) {
+      const value = n / v;
+      const formatted = Math.abs(value) < 10 ? value.toFixed(1) : value.toFixed(1);
+      const trimmed = formatted.replace(/\.0$/, "");
+      return `$${trimmed}${s}`;
+    }
+  }
+  // Less than 1k, show full dollars with no decimals
+  return `$${Math.round(n).toString()}`;
+}
+
 function renderSparkline(points: [number, number][], width = 1000, height = 300) {
   if (!points || points.length === 0) return "";
   const values = points.map((p) => p[1]);
@@ -95,7 +116,7 @@ export async function GET(req: Request) {
             </div>
             <div style={{ marginLeft: "auto", textAlign: "right", display: "flex", flexDirection: "column" }}>
               <div style={{ display: "flex", fontSize: 40, fontWeight: 700 }}>{formatUsd(price)}</div>
-              <div style={{ display: "flex", fontSize: 24, color: "#9ca3af" }}>Market Cap {formatUsd(marketCap)}</div>
+              <div style={{ display: "flex", fontSize: 24, color: "#9ca3af" }}>Market Cap {formatUsdAbbrev(marketCap)}</div>
             </div>
           </div>
           <div
