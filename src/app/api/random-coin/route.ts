@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { fetchAllCoins, pickRandomCoin, type CoinGeckoCoin } from "@/lib/coingecko";
+import { fetchCoinsByCategory, pickRandomCoin, type CoinGeckoCoin } from "@/lib/coingecko";
 import { getJSON, setWithTTL } from "@/lib/redis";
-import { RANDOM_COIN_CACHE_KEY, RANDOM_COIN_CACHE_TTL_SECONDS } from "@/lib/cache";
+import { RANDOM_COIN_CACHE_KEY, RANDOM_COIN_CACHE_TTL_SECONDS, RANDOM_COIN_CATEGORY } from "@/lib/cache";
 
 export async function GET() {
   try {
@@ -10,8 +10,8 @@ export async function GET() {
       return NextResponse.json({ source: "cache", coin: cached });
     }
 
-    const apiKey = process.env.COINGECKO_API_KEY;
-    const coins = await fetchAllCoins(apiKey);
+    const apiKey = process.env.COINGECKO_DEMO_API_KEY ?? process.env.COINGECKO_API_KEY;
+    const coins = await fetchCoinsByCategory(RANDOM_COIN_CATEGORY, apiKey);
     const coin = pickRandomCoin(coins);
     if (!coin) {
       return NextResponse.json({ error: "No coins found" }, { status: 500 });
