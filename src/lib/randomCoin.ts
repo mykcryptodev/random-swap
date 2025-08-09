@@ -9,28 +9,12 @@ import {
   type MarketChart,
 } from "@/lib/coingecko";
 import {
-  RANDOM_COIN_CACHE_KEY,
   RANDOM_COIN_CACHE_TTL_SECONDS,
   RANDOM_COIN_CATEGORY,
   RANDOM_COIN_CHART_DAYS,
 } from "@/lib/cache";
 
-export async function getOrRefreshRandomCoin(): Promise<CoinGeckoCoin | null> {
-  const cached = await getJSON<CoinGeckoCoin>(RANDOM_COIN_CACHE_KEY);
-  if (cached) return cached;
 
-  const apiKey = process.env.COINGECKO_DEMO_API_KEY ?? process.env.COINGECKO_API_KEY;
-  const coins = await fetchCoinsByCategory(RANDOM_COIN_CATEGORY, apiKey);
-  const coin = pickRandomCoin(coins);
-  if (!coin) return null;
-
-  const created = await setWithTTLIfNotExists(RANDOM_COIN_CACHE_KEY, coin, RANDOM_COIN_CACHE_TTL_SECONDS);
-  if (!created) {
-    const settled = await getJSON<CoinGeckoCoin>(RANDOM_COIN_CACHE_KEY);
-    if (settled) return settled;
-  }
-  return coin;
-}
 
 export type RandomCoinPayload = {
   coin: CoinGeckoCoin;
@@ -77,7 +61,6 @@ export async function getOrRefreshRandomCoinPayload(): Promise<RandomCoinPayload
     const coins = await fetchCoinsByCategory(RANDOM_COIN_CATEGORY, apiKey);
     const coin = pickRandomCoin(coins);
     if (!coin) {
-      console.error("No coin picked from category");
       return null;
     }
 
@@ -94,18 +77,15 @@ export async function getOrRefreshRandomCoinPayload(): Promise<RandomCoinPayload
 
     const payload: RandomCoinPayload = { coin, details, chart, ogImageBase64 };
     
-    // Step 4: Store the payload with TTL (use regular set, not NX)
+    // Step 4: Store the payload with TTL
     const client = getRedisClient();
-    // Upstash Redis can handle objects directly
     await client.set(MAIN_KEY, payload, { ex: RANDOM_COIN_CACHE_TTL_SECONDS });
     
-    console.log(`Cached new payload for ${coin.name}, image length: ${ogImageBase64.length}`);
     return payload;
   } catch (error) {
-    console.error("Error fetching/generating payload:", error);
     throw error;
   } finally {
-    // Always release the lock (it will auto-expire anyway)
+    // Lock will auto-expire
   }
 }
 

@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@upstash/redis": "^1.31.6",
-    "dotenv": "^17.2.1",
     "next": "15.4.6",
     "react": "19.1.0",
     "react-dom": "19.1.0"

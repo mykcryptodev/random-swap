@@ -21,12 +21,6 @@ export function getRedisClient(): Redis {
   return redis;
 }
 
-export async function setWithTTL<T>(key: string, value: T, ttlSeconds: number): Promise<void> {
-  const client = getRedisClient();
-  // Upstash Redis can handle objects directly
-  await client.set(key, value, { ex: ttlSeconds });
-}
-
 export async function getJSON<T>(key: string): Promise<T | null> {
   const client = getRedisClient();
   // Upstash Redis automatically handles JSON serialization/deserialization
