@@ -1,27 +1,54 @@
 import Image from "next/image";
 import type { Metadata } from "next";
 import { getOrRefreshRandomCoin } from "@/lib/randomCoin";
+import { fetchCoinDetails } from "@/lib/coingecko";
+
+function getBaseUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || "";
+  if (!raw) return "";
+  return raw.startsWith("http://") || raw.startsWith("https://") ? raw : `https://${raw}`;
+}
 
 export async function generateMetadata(): Promise<Metadata> {
   const coin = await getOrRefreshRandomCoin();
   const tokenName = coin?.name ?? "Token";
-  const ogUrl = coin ? `${process.env.NEXT_PUBLIC_BASE_URL ?? ""}/api/og?id=${encodeURIComponent(coin.id)}&days=7` : undefined;
+  const baseUrl = getBaseUrl();
+  const ogUrl = coin && baseUrl ? `${baseUrl}/api/og?id=${encodeURIComponent(coin.id)}&days=7` : undefined;
+
+  // Build CAIP-19 for Base (chainId 8453) using ERC20 contract address when available
+  let caip19Token: string | undefined;
+  let actionUrl: string | undefined;
+  if (coin) {
+    const apiKey = process.env.COINGECKO_DEMO_API_KEY ?? process.env.COINGECKO_API_KEY;
+    const details = await fetchCoinDetails(coin.id, apiKey);
+    const platforms = details.platforms ?? {};
+    const baseKey = Object.keys(platforms).find(
+      (k) => k.toLowerCase() === "base" || k.toLowerCase().includes("base")
+    );
+    const contract = baseKey ? platforms[baseKey] || undefined : undefined;
+    if (contract && /^0x[a-fA-F0-9]{40}$/.test(contract)) {
+      const addressLower = contract.toLowerCase();
+      caip19Token = `eip155:8453/erc20:${addressLower}`;
+      actionUrl = baseUrl || undefined; // Use site URL as requested
+    } else {
+      // Fallback to native asset on Base if no contract found
+      caip19Token = `eip155:8453/slip44:60`;
+      actionUrl = baseUrl || undefined; // Use site URL as requested
+    }
+  }
 
   const frame = {
     version: "next",
     imageUrl: ogUrl ??
-      "https://wallet.coinbase.com/api/miniapps/social-swap/image?networkId=networks/ethereum-mainnet&nativeAssetSymbol=ETH",
+      "",
     button: {
-      title: "Trade",
+      title: `Swap ${tokenName}`,
       action: {
         type: "view_token",
         swap: true,
-        token: "eip155:1/slip44:60",
+        token: caip19Token ?? "eip155:8453/slip44:60",
         name: `Swap ${tokenName}`,
-        url: "https://wallet.coinbase.com/asset?networkId=networks/ethereum-mainnet&contractAddress=native",
-        splashImageUrl:
-          "https://go.wallet.coinbase.com/static/wallets/coinbase-wallet.svg",
-        splashBackgroundColor: "#0a0b0d",
+        url: actionUrl ?? baseUrl ?? "",
       },
     },
   } as const;

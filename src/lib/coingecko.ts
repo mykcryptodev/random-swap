@@ -99,6 +99,7 @@ export type CoinDetails = {
     current_price?: { usd?: number };
     market_cap?: { usd?: number };
   };
+  platforms?: Record<string, string | null>;
 };
 
 export async function fetchCoinDetails(id: string, apiKey?: string): Promise<CoinDetails> {
