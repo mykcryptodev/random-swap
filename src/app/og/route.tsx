@@ -1,8 +1,7 @@
 import { ImageResponse } from "next/og";
-import { fetchCoinDetails, fetchCoinMarketChart } from "@/lib/coingecko";
-import { getOrRefreshRandomCoinPayload } from "@/lib/randomCoin";
-import { RANDOM_COIN_CHART_DAYS } from "@/lib/cache";
-import { getJSON, setWithTTLIfNotExists } from "@/lib/redis";
+import { getJSON } from "@/lib/redis";
+import { RANDOM_COIN_CHART_DAYS, RANDOM_COIN_PAYLOAD_CACHE_KEY } from "@/lib/cache";
+import type { RandomCoinPayload } from "@/lib/randomCoin";
 
 export const runtime = "edge";
 
@@ -91,39 +90,18 @@ export async function GET(req: Request) {
   }
 
   try {
-    let details, chart;
-    // Always prefer using the app's cached random payload if it exists
-    const globalPayload = await getOrRefreshRandomCoinPayload();
-    if (globalPayload) {
-      details = globalPayload.details;
-      chart = globalPayload.chart;
-    } else {
-      // No global payload yet → optionally fetch per-coin once, with short cache
-      type CoinOgPayload = { details: Awaited<ReturnType<typeof fetchCoinDetails>>; chart: Awaited<ReturnType<typeof fetchCoinMarketChart>> };
-      const cacheKey = id ? `og:payload:${id}:d${days}` : undefined;
-      if (cacheKey) {
-        const cached = await getJSON<CoinOgPayload>(cacheKey);
-        if (cached) {
-          details = cached.details;
-          chart = cached.chart;
-        } else if (id) {
-          const apiKey = process.env.COINGECKO_DEMO_API_KEY ?? process.env.COINGECKO_API_KEY;
-          [details, chart] = await Promise.all([
-            fetchCoinDetails(id, apiKey),
-            fetchCoinMarketChart(id, days, apiKey),
-          ]);
-          await setWithTTLIfNotExists(cacheKey, { details, chart }, 60);
-        }
-      }
-      if (!details || !chart) throw new Error("No data available to render OG image");
+    const payload = await getJSON<RandomCoinPayload>(RANDOM_COIN_PAYLOAD_CACHE_KEY);
+    if (!payload || payload.coin.id !== id) {
+      throw new Error("No cached payload for id");
     }
 
-    const price = details.market_data?.current_price?.usd;
-    const marketCap = details.market_data?.market_cap?.usd;
-    const name = details.name;
-    const symbol = details.symbol?.toUpperCase();
-    const image = details.image?.large || details.image?.small || details.image?.thumb;
-    const color = details.color || "#0ea5e9"; // default teal-ish if none
+    const { coin, chart } = payload;
+    const price = coin.current_price;
+    const marketCap = coin.market_cap;
+    const name = coin.name;
+    const symbol = coin.symbol?.toUpperCase();
+    const image = coin.image;
+    const color = "#0ea5e9";
     const origin = new URL(req.url).origin;
     const cgLogo = `${origin}/cg.svg`;
 
@@ -147,46 +125,46 @@ export async function GET(req: Request) {
         >
           {/* Centered safe-area wrapper */}
           <div style={{ display: "flex", flexDirection: "column", width: SAFE_W, alignSelf: "center", gap: OUTER_GAP }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-            {image ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+              {image ? (
+                <img
+                  src={image}
+                  width={96}
+                  height={96}
+                  alt={name}
+                  style={{ borderRadius: 16, background: "#f0f3f7", display: "flex" }}
+                />
+              ) : null}
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <div style={{ display: "flex", fontSize: 48, fontWeight: 700 }}>{name}</div>
+                <div style={{ display: "flex", fontSize: 28, color: "#6b7280" }}>{symbol}</div>
+              </div>
+              <div style={{ marginLeft: "auto", textAlign: "right", display: "flex", flexDirection: "column" }}>
+                <div style={{ display: "flex", fontSize: 40, fontWeight: 700 }}>{formatUsd(price)}</div>
+                <div style={{ display: "flex", fontSize: 24, color: "#6b7280" }}>Market Cap {formatUsdAbbrev(marketCap)}</div>
+              </div>
+            </div>
+            <div
+              style={{
+                borderRadius: 24,
+                background: "#ffffff",
+                padding: CARD_PADDING,
+                display: "flex",
+                flexDirection: "column",
+                gap: 16,
+                position: "relative",
+              }}
+            >
+              <div style={{ display: "flex", fontSize: 24, color: "#6b7280" }}>{days}d price</div>
+              <div style={{ display: "flex" }}>{renderSparkline(chart.prices, chartWidth, chartHeight, color)}</div>
               <img
-                src={image}
-                width={96}
-                height={96}
-                alt={name}
-                style={{ borderRadius: 16, background: "#f0f3f7", display: "flex" }}
+                src={cgLogo}
+                width={32}
+                height={32}
+                alt="CoinGecko"
+                style={{ position: "absolute", right: CARD_PADDING, bottom: CARD_PADDING, display: "flex" }}
               />
-            ) : null}
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              <div style={{ display: "flex", fontSize: 48, fontWeight: 700 }}>{name}</div>
-              <div style={{ display: "flex", fontSize: 28, color: "#6b7280" }}>{symbol}</div>
             </div>
-            <div style={{ marginLeft: "auto", textAlign: "right", display: "flex", flexDirection: "column" }}>
-              <div style={{ display: "flex", fontSize: 40, fontWeight: 700 }}>{formatUsd(price)}</div>
-              <div style={{ display: "flex", fontSize: 24, color: "#6b7280" }}>Market Cap {formatUsdAbbrev(marketCap)}</div>
-            </div>
-          </div>
-          <div
-            style={{
-              borderRadius: 24,
-              background: "#ffffff",
-              padding: CARD_PADDING,
-              display: "flex",
-              flexDirection: "column",
-              gap: 16,
-              position: "relative",
-            }}
-          >
-            <div style={{ display: "flex", fontSize: 24, color: "#6b7280" }}>{days}d price</div>
-            <div style={{ display: "flex" }}>{renderSparkline(chart.prices, chartWidth, chartHeight, color)}</div>
-            <img
-              src={cgLogo}
-              width={32}
-              height={32}
-              alt="CoinGecko"
-              style={{ position: "absolute", right: CARD_PADDING, bottom: CARD_PADDING, display: "flex" }}
-            />
-          </div>
           </div>
         </div>
       ),
