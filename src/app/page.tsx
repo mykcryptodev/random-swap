@@ -1,4 +1,39 @@
 import Image from "next/image";
+import type { Metadata } from "next";
+import { getOrRefreshRandomCoin } from "@/lib/randomCoin";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const coin = await getOrRefreshRandomCoin();
+  const tokenName = coin?.name ?? "Token";
+
+  const frame = {
+    version: "next",
+    imageUrl:
+      "https://wallet.coinbase.com/api/miniapps/social-swap/image?networkId=networks/ethereum-mainnet&nativeAssetSymbol=ETH",
+    button: {
+      title: "Trade",
+      action: {
+        type: "view_token",
+        swap: true,
+        token: "eip155:1/slip44:60",
+        name: `Swap ${tokenName}`,
+        url: "https://wallet.coinbase.com/asset?networkId=networks/ethereum-mainnet&contractAddress=native",
+        splashImageUrl:
+          "https://go.wallet.coinbase.com/static/wallets/coinbase-wallet.svg",
+        splashBackgroundColor: "#0a0b0d",
+      },
+    },
+  } as const;
+
+  return {
+    title: `Random Swap — ${tokenName}`,
+    description: "Swap a random token each visit.",
+    // Renders as <meta name="fc:frame" content="...">
+    other: {
+      "fc:frame": JSON.stringify(frame),
+    },
+  };
+}
 
 export default function Home() {
   return (
