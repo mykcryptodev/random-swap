@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getOrRefreshRandomCoinPayload } from "@/lib/randomCoin";
+import { RANDOM_COIN_CACHE_TTL_SECONDS } from "@/lib/cache";
 
 export async function GET() {
   try {
@@ -20,7 +21,7 @@ export async function GET() {
       status: 200,
       headers: {
         "Content-Type": "image/png",
-        "Cache-Control": "public, max-age=300", // Cache for 5 minutes to match our Redis TTL
+        "Cache-Control": `public, max-age=${RANDOM_COIN_CACHE_TTL_SECONDS / 2}`, // Cache for 30 seconds
       },
     });
   } catch (error) {
