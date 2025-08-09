@@ -65,7 +65,13 @@ export default async function Home() {
   const payload = await getOrRefreshRandomCoinPayload();
   const coin = payload?.coin;
   const tokenName = coin?.name ?? "Token";
-  const ogPath = payload ? `/api/og?id=__cached__&days=7` : null;
+  const ogPath = payload ? `/api/og?id=__cached__&days=30` : null;
+  const baseUrl = getBaseUrl();
+  const embedUrl = baseUrl || null;
+  const shareText = "Swap a random token in the feed!";
+  const shareUrl = embedUrl
+    ? `https://warpcast.com/~/compose?text=${encodeURIComponent(shareText)}&embeds[]=${encodeURIComponent(embedUrl)}`
+    : null;
 
   return (
     <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
@@ -82,6 +88,19 @@ export default async function Home() {
         ) : (
           <div className="text-sm text-neutral-500">No coin selected.</div>
         )}
+
+        {shareUrl ? (
+          <div className="flex w-full justify-center gap-2">
+            <a
+              href={shareUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center rounded-md border border-black/10 px-4 py-2 text-sm font-medium text-black bg-white hover:bg-black/5"
+            >
+              Share on Farcaster
+            </a>
+          </div>
+        ) : null}
       </main>
     </div>
   );

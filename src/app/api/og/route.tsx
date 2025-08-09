@@ -5,6 +5,13 @@ import { RANDOM_COIN_CHART_DAYS } from "@/lib/cache";
 
 export const runtime = "edge";
 
+// Canvas constants (3:2 aspect ratio) and safe area (10% margins left/right)
+const CANVAS_W = 1200; // width
+const CANVAS_H = 800;  // height (3:2)
+const SAFE_W = Math.floor(CANVAS_W * 0.8); // 80% centered safe area
+const OUTER_GAP = 24;
+const CARD_PADDING = 24;
+
 function formatUsd(n?: number): string {
   if (n == null) return "-";
   try {
@@ -52,8 +59,16 @@ function renderSparkline(points: [number, number][], width = 1000, height = 300,
   const d = points
     .map(([, v], i) => `${i === 0 ? "M" : "L"}${i * dx},${scaleY(v)}`)
     .join(" ");
+  const areaD = `${d} V ${height} H 0 Z`;
   return (
     <svg width={width} height={height} style={{ display: "block" }}>
+      <defs>
+        <linearGradient id="spark-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={stroke} stopOpacity="0.18" />
+          <stop offset="100%" stopColor={stroke} stopOpacity="0.00" />
+        </linearGradient>
+      </defs>
+      <path d={areaD} fill="url(#spark-grad)" stroke="none" />
       <path d={d} fill="none" stroke={stroke} strokeWidth={6} />
     </svg>
   );
@@ -96,23 +111,26 @@ export async function GET(req: Request) {
     const image = details.image?.large || details.image?.small || details.image?.thumb;
     const color = details.color || "#0ea5e9"; // default teal-ish if none
 
+    const chartWidth = SAFE_W - CARD_PADDING * 2; // inner card width for sparkline
+    const chartHeight = 420;
+
     return new ImageResponse(
       (
         <div
           style={{
-            width: 1200,
-            height: 630,
+            width: CANVAS_W,
+            height: CANVAS_H,
             display: "flex",
             flexDirection: "column",
             padding: 48,
             background: "#ffffff",
             color: "#0b0d10",
-            gap: 24,
+            gap: OUTER_GAP,
             fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto",
           }}
         >
-          {/* Unsafe margins for clients that crop ~10% left/right */}
-          <div style={{ width: "100%", height: 0, display: "flex" }} />
+          {/* Centered safe-area wrapper */}
+          <div style={{ display: "flex", flexDirection: "column", width: SAFE_W, alignSelf: "center", gap: OUTER_GAP }}>
           <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
             {image ? (
               <img
@@ -136,23 +154,24 @@ export async function GET(req: Request) {
             style={{
               borderRadius: 24,
               background: "#f5f7fb",
-              padding: 24,
+              padding: CARD_PADDING,
               display: "flex",
               flexDirection: "column",
               gap: 16,
             }}
           >
             <div style={{ display: "flex", fontSize: 24, color: "#6b7280" }}>{days}d price</div>
-            <div style={{ display: "flex" }}>{renderSparkline(chart.prices, 1104, 360, color)}</div>
+            <div style={{ display: "flex" }}>{renderSparkline(chart.prices, chartWidth, chartHeight, color)}</div>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ display: "flex", fontSize: 24, color: "#6b7280" }}>
               Powered by CoinGecko • Generated on Vercel
             </div>
           </div>
+          </div>
         </div>
       ),
-      { width: 1200, height: 630 }
+      { width: CANVAS_W, height: CANVAS_H }
     );
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
