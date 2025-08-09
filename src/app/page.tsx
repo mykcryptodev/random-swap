@@ -13,7 +13,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const coin = payload?.coin;
   const tokenName = coin?.name ?? "Token";
   const baseUrl = getBaseUrl();
-  const ogUrl = payload?.ogImageBase64;
+  // Use the frame-image endpoint URL for Farcaster (it requires a real URL, not base64)
+  const ogUrl = baseUrl ? `${baseUrl}/api/frame-image` : undefined;
 
   // Build CAIP-19 for Base (chainId 8453) using ERC20 contract address when available
   let caip19Token: string | undefined;
@@ -54,6 +55,17 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: `Random Swap — ${tokenName}`,
     description: "Swap a random token each visit.",
+    openGraph: {
+      title: `Random Swap — ${tokenName}`,
+      description: "Swap a random token each visit.",
+      images: ogUrl ? [{ url: ogUrl, width: 1200, height: 800 }] : [],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `Random Swap — ${tokenName}`,
+      description: "Swap a random token each visit.",
+      images: ogUrl ? [ogUrl] : [],
+    },
     // Renders as <meta name="fc:frame" content="...">
     other: {
       "fc:frame": JSON.stringify(frame),
