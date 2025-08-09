@@ -69,7 +69,7 @@ function renderSparkline(points: [number, number][], width = 1000, height = 300,
         </linearGradient>
       </defs>
       <path d={areaD} fill="url(#spark-grad)" stroke="none" />
-      <path d={d} fill="none" stroke={stroke} strokeWidth={6} />
+      <path d={d} fill="none" stroke={stroke} strokeWidth={8} strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -153,7 +153,7 @@ export async function GET(req: Request) {
           <div
             style={{
               borderRadius: 24,
-              background: "#f5f7fb",
+              background: "#ffffff",
               padding: CARD_PADDING,
               display: "flex",
               flexDirection: "column",
@@ -165,7 +165,7 @@ export async function GET(req: Request) {
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ display: "flex", fontSize: 24, color: "#6b7280" }}>
-              Powered by CoinGecko • Generated on Vercel
+              Powered by CoinGecko
             </div>
           </div>
           </div>
