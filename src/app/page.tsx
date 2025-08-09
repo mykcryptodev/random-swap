@@ -1,6 +1,6 @@
-import Image from "next/image";
 import type { Metadata } from "next";
 import { getOrRefreshRandomCoinPayload } from "@/lib/randomCoin";
+import { RANDOM_COIN_CHART_DAYS } from "@/lib/cache";
 
 function getBaseUrl(): string {
   const raw = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || "";
@@ -13,27 +13,13 @@ export async function generateMetadata(): Promise<Metadata> {
   const coin = payload?.coin;
   const tokenName = coin?.name ?? "Token";
   const baseUrl = getBaseUrl();
-  const ogUrl = payload && baseUrl && coin ? `${baseUrl}/api/og?id=${encodeURIComponent(coin.id)}&days=30` : undefined;
+  const ogUrl =
+    payload && baseUrl && coin
+      ? `${baseUrl}/og?id=${encodeURIComponent(coin.id)}&days=${RANDOM_COIN_CHART_DAYS}`
+      : undefined;
 
-  // Build CAIP-19 for Base (chainId 8453) using ERC20 contract address when available
-  let caip19Token: string | undefined;
-  let actionUrl: string | undefined;
-  if (payload?.details) {
-    const platforms = payload.details.platforms ?? {};
-    const baseKey = Object.keys(platforms).find(
-      (k) => k.toLowerCase() === "base" || k.toLowerCase().includes("base")
-    );
-    const contract = baseKey ? platforms[baseKey] || undefined : undefined;
-    if (contract && /^0x[a-fA-F0-9]{40}$/.test(contract)) {
-      const addressLower = contract.toLowerCase();
-      caip19Token = `eip155:8453/erc20:${addressLower}`;
-      actionUrl = baseUrl || undefined; // Use site URL as requested
-    } else {
-      // Fallback to native asset on Base if no contract found
-      caip19Token = `eip155:8453/slip44:60`;
-      actionUrl = baseUrl || undefined; // Use site URL as requested
-    }
-  }
+  const caip19Token = `eip155:8453/slip44:60`;
+  const actionUrl = baseUrl || undefined;
 
   const frame = {
     version: "next",
@@ -44,9 +30,9 @@ export async function generateMetadata(): Promise<Metadata> {
       action: {
         type: "view_token",
         swap: true,
-        token: caip19Token ?? "eip155:8453/slip44:60",
+        token: caip19Token,
         name: `Swap ${tokenName}`,
-        url: actionUrl ?? baseUrl ?? "",
+        url: actionUrl ?? "",
       },
     },
   } as const;
@@ -65,7 +51,8 @@ export default async function Home() {
   const payload = await getOrRefreshRandomCoinPayload();
   const coin = payload?.coin;
   const tokenName = coin?.name ?? "Token";
-  const ogPath = payload && coin ? `/api/og?id=${encodeURIComponent(coin.id)}&days=30` : null;
+  const ogPath =
+    payload && coin ? `/og?id=${encodeURIComponent(coin.id)}&days=${RANDOM_COIN_CHART_DAYS}` : null;
   const baseUrl = getBaseUrl();
   const embedUrl = baseUrl || null;
   const shareText = "Swap a random token in the feed!";

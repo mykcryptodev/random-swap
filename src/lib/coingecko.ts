@@ -2,6 +2,9 @@ export type CoinGeckoCoin = {
   id: string;
   symbol: string;
   name: string;
+  image?: string;
+  current_price?: number;
+  market_cap?: number;
 };
 
 const COINGECKO_API_BASE = "https://api.coingecko.com/api/v3";
@@ -51,6 +54,9 @@ type MarketCoin = {
   id: string;
   symbol: string;
   name: string;
+  image?: string;
+  current_price?: number;
+  market_cap?: number;
 };
 
 /**
@@ -86,7 +92,14 @@ export async function fetchCoinsByCategory(
     throw new Error(`CoinGecko markets failed: ${res.status} ${res.statusText} - ${text.slice(0, 200)}`);
   }
   const list = (await res.json()) as MarketCoin[];
-  return list.map((c) => ({ id: c.id, symbol: c.symbol, name: c.name }));
+  return list.map((c) => ({
+    id: c.id,
+    symbol: c.symbol,
+    name: c.name,
+    image: c.image,
+    current_price: c.current_price,
+    market_cap: c.market_cap,
+  }));
 }
 
 // Coin detail subset

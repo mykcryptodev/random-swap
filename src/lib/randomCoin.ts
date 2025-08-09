@@ -3,9 +3,7 @@ import {
   fetchCoinsByCategory,
   pickRandomCoin,
   type CoinGeckoCoin,
-  fetchCoinDetails,
   fetchCoinMarketChart,
-  type CoinDetails,
   type MarketChart,
 } from "@/lib/coingecko";
 import {
@@ -13,6 +11,7 @@ import {
   RANDOM_COIN_CACHE_TTL_SECONDS,
   RANDOM_COIN_CATEGORY,
   RANDOM_COIN_CHART_DAYS,
+  RANDOM_COIN_PAYLOAD_CACHE_KEY,
 } from "@/lib/cache";
 
 export async function getOrRefreshRandomCoin(): Promise<CoinGeckoCoin | null> {
@@ -34,22 +33,18 @@ export async function getOrRefreshRandomCoin(): Promise<CoinGeckoCoin | null> {
 
 export type RandomCoinPayload = {
   coin: CoinGeckoCoin;
-  details: CoinDetails;
   chart: MarketChart;
 };
 
 export async function getOrRefreshRandomCoinPayload(): Promise<RandomCoinPayload | null> {
-  // Single cache key for the entire payload
-  const MAIN_KEY = "random-coin-complete-v2";
-  
   // Step 1: Check if we have a cached payload
-  const cached = await getJSON<RandomCoinPayload>(MAIN_KEY);
+  const cached = await getJSON<RandomCoinPayload>(RANDOM_COIN_PAYLOAD_CACHE_KEY);
   if (cached) {
     return cached;
   }
 
   // Step 2: Try to acquire a lock to prevent stampede
-  const LOCK_KEY = `${MAIN_KEY}:lock`;
+  const LOCK_KEY = `${RANDOM_COIN_PAYLOAD_CACHE_KEY}:lock`;
   const lockAcquired = await setWithTTLIfNotExists(LOCK_KEY, "locked", 10); // 10s lock
   
   if (!lockAcquired) {
@@ -59,7 +54,7 @@ export async function getOrRefreshRandomCoinPayload(): Promise<RandomCoinPayload
     // Try to get the result again (recursive with max retries)
     const maxRetries = 10;
     for (let i = 0; i < maxRetries; i++) {
-      const result = await getJSON<RandomCoinPayload>(MAIN_KEY);
+      const result = await getJSON<RandomCoinPayload>(RANDOM_COIN_PAYLOAD_CACHE_KEY);
       if (result) {
         return result;
       }
@@ -73,22 +68,18 @@ export async function getOrRefreshRandomCoinPayload(): Promise<RandomCoinPayload
   // Step 3: We have the lock, fetch fresh data
   try {
     const apiKey = process.env.COINGECKO_DEMO_API_KEY ?? process.env.COINGECKO_API_KEY;
-    const coins = await fetchCoinsByCategory(RANDOM_COIN_CATEGORY, apiKey);
-    const coin = pickRandomCoin(coins);
+    const coin = await getOrRefreshRandomCoin();
     if (!coin) {
       return null;
     }
 
-    const [details, chart] = await Promise.all([
-      fetchCoinDetails(coin.id, apiKey),
-      fetchCoinMarketChart(coin.id, RANDOM_COIN_CHART_DAYS, apiKey),
-    ]);
+    const chart = await fetchCoinMarketChart(coin.id, RANDOM_COIN_CHART_DAYS, apiKey);
 
-    const payload: RandomCoinPayload = { coin, details, chart };
-    
+    const payload: RandomCoinPayload = { coin, chart };
+
     // Step 4: Store the payload with TTL (use regular set, not NX)
     const client = getRedisClient();
-    await client.set(MAIN_KEY, JSON.stringify(payload), { ex: RANDOM_COIN_CACHE_TTL_SECONDS });
+    await client.set(RANDOM_COIN_PAYLOAD_CACHE_KEY, JSON.stringify(payload), { ex: RANDOM_COIN_CACHE_TTL_SECONDS });
     
     return payload;
   } finally {
