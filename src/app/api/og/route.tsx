@@ -92,28 +92,30 @@ export async function GET(req: Request) {
 
   try {
     let details, chart;
-    if (id === "__cached__") {
-      const payload = await getOrRefreshRandomCoinPayload();
-      if (!payload) throw new Error("Failed to load cached random coin payload");
-      details = payload.details;
-      chart = payload.chart;
+    // Always prefer using the app's cached random payload if it exists
+    const globalPayload = await getOrRefreshRandomCoinPayload();
+    if (globalPayload) {
+      details = globalPayload.details;
+      chart = globalPayload.chart;
     } else {
-      // Per-coin payload cache to prevent 429s from CoinGecko
+      // No global payload yet → optionally fetch per-coin once, with short cache
       type CoinOgPayload = { details: Awaited<ReturnType<typeof fetchCoinDetails>>; chart: Awaited<ReturnType<typeof fetchCoinMarketChart>> };
-      const cacheKey = `og:payload:${id}:d${days}`;
-      const cached = await getJSON<CoinOgPayload>(cacheKey);
-      if (cached) {
-        details = cached.details;
-        chart = cached.chart;
-      } else {
-        const apiKey = process.env.COINGECKO_DEMO_API_KEY ?? process.env.COINGECKO_API_KEY;
-        [details, chart] = await Promise.all([
-          fetchCoinDetails(id, apiKey),
-          fetchCoinMarketChart(id, days, apiKey),
-        ]);
-        // Cache for 60s to align with random payload TTL
-        await setWithTTLIfNotExists(cacheKey, { details, chart }, 60);
+      const cacheKey = id ? `og:payload:${id}:d${days}` : undefined;
+      if (cacheKey) {
+        const cached = await getJSON<CoinOgPayload>(cacheKey);
+        if (cached) {
+          details = cached.details;
+          chart = cached.chart;
+        } else if (id) {
+          const apiKey = process.env.COINGECKO_DEMO_API_KEY ?? process.env.COINGECKO_API_KEY;
+          [details, chart] = await Promise.all([
+            fetchCoinDetails(id, apiKey),
+            fetchCoinMarketChart(id, days, apiKey),
+          ]);
+          await setWithTTLIfNotExists(cacheKey, { details, chart }, 60);
+        }
       }
+      if (!details || !chart) throw new Error("No data available to render OG image");
     }
 
     const price = details.market_data?.current_price?.usd;
@@ -184,11 +186,6 @@ export async function GET(req: Request) {
               alt="CoinGecko"
               style={{ position: "absolute", right: CARD_PADDING, bottom: CARD_PADDING, display: "flex" }}
             />
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ display: "flex", fontSize: 24, color: "#6b7280" }}>
-              Powered by CoinGecko
-            </div>
           </div>
           </div>
         </div>
