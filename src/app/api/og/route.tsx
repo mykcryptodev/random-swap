@@ -110,6 +110,8 @@ export async function GET(req: Request) {
     const symbol = details.symbol?.toUpperCase();
     const image = details.image?.large || details.image?.small || details.image?.thumb;
     const color = details.color || "#0ea5e9"; // default teal-ish if none
+    const origin = new URL(req.url).origin;
+    const cgLogo = `${origin}/cg.svg`;
 
     const chartWidth = SAFE_W - CARD_PADDING * 2; // inner card width for sparkline
     const chartHeight = 420;
@@ -158,10 +160,18 @@ export async function GET(req: Request) {
               display: "flex",
               flexDirection: "column",
               gap: 16,
+              position: "relative",
             }}
           >
             <div style={{ display: "flex", fontSize: 24, color: "#6b7280" }}>{days}d price</div>
             <div style={{ display: "flex" }}>{renderSparkline(chart.prices, chartWidth, chartHeight, color)}</div>
+            <img
+              src={cgLogo}
+              width={32}
+              height={32}
+              alt="CoinGecko"
+              style={{ position: "absolute", right: CARD_PADDING, bottom: CARD_PADDING, display: "flex" }}
+            />
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ display: "flex", fontSize: 24, color: "#6b7280" }}>
