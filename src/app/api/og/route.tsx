@@ -6,10 +6,10 @@ import { getJSON, setWithTTLIfNotExists } from "@/lib/redis";
 
 export const runtime = "edge";
 
-// Canvas constants (3:2 aspect ratio) and safe area (10% margins left/right)
+// Canvas constants (3:2 aspect ratio) and safe area (reduced side margins)
 const CANVAS_W = 1200; // width
 const CANVAS_H = 800;  // height (3:2)
-const SAFE_W = Math.floor(CANVAS_W * 0.8); // 80% centered safe area
+const SAFE_W = Math.floor(CANVAS_W * 0.92); // 92% centered safe area
 const OUTER_GAP = 24;
 const CARD_PADDING = 24;
 
