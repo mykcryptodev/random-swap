@@ -12,6 +12,8 @@ import {
   RANDOM_COIN_CACHE_TTL_SECONDS,
   RANDOM_COIN_CATEGORY,
   RANDOM_COIN_CHART_DAYS,
+  APP_MODE,
+  EXACT_COINGECKO_ID,
 } from "@/lib/cache";
 
 
@@ -24,8 +26,10 @@ export type RandomCoinPayload = {
 };
 
 export async function getOrRefreshRandomCoinPayload(): Promise<RandomCoinPayload | null> {
-  // Single cache key for the entire payload
-  const MAIN_KEY = "random-coin-complete-v3";
+  // Distinct cache keys per mode/coin to avoid collisions
+  const isExact = APP_MODE === "exact" && !!EXACT_COINGECKO_ID;
+  const mainKeySuffix = isExact ? `exact:${EXACT_COINGECKO_ID}` : "random";
+  const MAIN_KEY = `random-coin-complete-v4:${mainKeySuffix}`;
   
   // Step 1: Check if we have a cached payload
   const cached = await getJSON<RandomCoinPayload>(MAIN_KEY);
@@ -58,16 +62,28 @@ export async function getOrRefreshRandomCoinPayload(): Promise<RandomCoinPayload
   // Step 3: We have the lock, fetch fresh data
   try {
     const apiKey = process.env.COINGECKO_DEMO_API_KEY ?? process.env.COINGECKO_API_KEY;
-    const coins = await fetchCoinsByCategory(RANDOM_COIN_CATEGORY, apiKey);
-    const coin = pickRandomCoin(coins);
-    if (!coin) {
-      return null;
-    }
 
-    const [details, chart] = await Promise.all([
-      fetchCoinDetails(coin.id, apiKey),
-      fetchCoinMarketChart(coin.id, RANDOM_COIN_CHART_DAYS, apiKey),
-    ]);
+    let coin: CoinGeckoCoin | null = null;
+    let details: CoinDetails;
+    let chart: MarketChart;
+
+    if (isExact) {
+      // Exact mode: fetch by specific ID
+      details = await fetchCoinDetails(EXACT_COINGECKO_ID, apiKey);
+      chart = await fetchCoinMarketChart(EXACT_COINGECKO_ID, RANDOM_COIN_CHART_DAYS, apiKey);
+      coin = { id: details.id, symbol: details.symbol, name: details.name };
+    } else {
+      // Random mode: pick from category
+      const coins = await fetchCoinsByCategory(RANDOM_COIN_CATEGORY, apiKey);
+      coin = pickRandomCoin(coins);
+      if (!coin) {
+        return null;
+      }
+      [details, chart] = await Promise.all([
+        fetchCoinDetails(coin.id, apiKey),
+        fetchCoinMarketChart(coin.id, RANDOM_COIN_CHART_DAYS, apiKey),
+      ]);
+    }
 
     // Generate the OG image as base64
     const { generateOgImageBase64 } = await import("@/lib/generateOgImage");
@@ -75,7 +91,7 @@ export async function getOrRefreshRandomCoinPayload(): Promise<RandomCoinPayload
     const fullOrigin = origin.startsWith("http") ? origin : `https://${origin}`;
     const ogImageBase64 = await generateOgImageBase64(details, chart, RANDOM_COIN_CHART_DAYS, fullOrigin);
 
-    const payload: RandomCoinPayload = { coin, details, chart, ogImageBase64 };
+    const payload: RandomCoinPayload = { coin: coin!, details, chart, ogImageBase64 };
     
     // Step 4: Store the payload with TTL
     const client = getRedisClient();

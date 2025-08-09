@@ -48,14 +48,14 @@ export async function generateMetadata(): Promise<Metadata> {
         type: "view_token",
         swap: true,
         token: caip19Token ?? "eip155:8453/slip44:60",
-        name: `Swap`,
+        name: `Swap ${tokenName}`,
         url: actionUrl ?? baseUrl ?? "",
       },
     },
   } as const;
 
   return {
-    title: `Random Swap`,
+    title: `Random Swap — ${tokenName}`,
     description: "Swap a random token each visit.",
     openGraph: {
       title: `Random Swap`,
@@ -64,7 +64,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     twitter: {
       card: "summary_large_image",
-      title: `Random Swap`,
+      title: `Random Swap — ${tokenName}`,
       description: "Swap a random token each visit.",
       images: ogUrl ? [ogUrl] : [],
     },
