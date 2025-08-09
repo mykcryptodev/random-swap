@@ -2,6 +2,7 @@ import { ImageResponse } from "next/og";
 import { fetchCoinDetails, fetchCoinMarketChart } from "@/lib/coingecko";
 import { getOrRefreshRandomCoinPayload } from "@/lib/randomCoin";
 import { RANDOM_COIN_CHART_DAYS } from "@/lib/cache";
+import { getJSON, setWithTTLIfNotExists } from "@/lib/redis";
 
 export const runtime = "edge";
 
@@ -97,11 +98,22 @@ export async function GET(req: Request) {
       details = payload.details;
       chart = payload.chart;
     } else {
-      const apiKey = process.env.COINGECKO_DEMO_API_KEY ?? process.env.COINGECKO_API_KEY;
-      [details, chart] = await Promise.all([
-        fetchCoinDetails(id, apiKey),
-        fetchCoinMarketChart(id, days, apiKey),
-      ]);
+      // Per-coin payload cache to prevent 429s from CoinGecko
+      type CoinOgPayload = { details: Awaited<ReturnType<typeof fetchCoinDetails>>; chart: Awaited<ReturnType<typeof fetchCoinMarketChart>> };
+      const cacheKey = `og:payload:${id}:d${days}`;
+      const cached = await getJSON<CoinOgPayload>(cacheKey);
+      if (cached) {
+        details = cached.details;
+        chart = cached.chart;
+      } else {
+        const apiKey = process.env.COINGECKO_DEMO_API_KEY ?? process.env.COINGECKO_API_KEY;
+        [details, chart] = await Promise.all([
+          fetchCoinDetails(id, apiKey),
+          fetchCoinMarketChart(id, days, apiKey),
+        ]);
+        // Cache for 60s to align with random payload TTL
+        await setWithTTLIfNotExists(cacheKey, { details, chart }, 60);
+      }
     }
 
     const price = details.market_data?.current_price?.usd;
