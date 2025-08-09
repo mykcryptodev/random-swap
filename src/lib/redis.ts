@@ -37,4 +37,14 @@ export async function getJSON<T>(key: string): Promise<T | null> {
   }
 }
 
+export async function setWithTTLIfNotExists<T>(
+  key: string,
+  value: T,
+  ttlSeconds: number
+): Promise<boolean> {
+  const client = getRedisClient();
+  const res = await client.set(key, JSON.stringify(value), { ex: ttlSeconds, nx: true });
+  return res === "OK";
+}
+
 

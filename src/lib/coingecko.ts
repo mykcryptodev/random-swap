@@ -95,6 +95,7 @@ export type CoinDetails = {
   symbol: string;
   name: string;
   image: { thumb?: string; small?: string; large?: string };
+  color?: string;
   market_data?: {
     current_price?: { usd?: number };
     market_cap?: { usd?: number };

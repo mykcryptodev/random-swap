@@ -1,5 +1,7 @@
 import { ImageResponse } from "next/og";
 import { fetchCoinDetails, fetchCoinMarketChart } from "@/lib/coingecko";
+import { getOrRefreshRandomCoinPayload } from "@/lib/randomCoin";
+import { RANDOM_COIN_CHART_DAYS } from "@/lib/cache";
 
 export const runtime = "edge";
 
@@ -37,7 +39,7 @@ function formatUsdAbbrev(n?: number): string {
   return `$${Math.round(n).toString()}`;
 }
 
-function renderSparkline(points: [number, number][], width = 1000, height = 300) {
+function renderSparkline(points: [number, number][], width = 1000, height = 300, stroke = "#22d3ee") {
   if (!points || points.length === 0) return "";
   const values = points.map((p) => p[1]);
   const min = Math.min(...values);
@@ -52,7 +54,7 @@ function renderSparkline(points: [number, number][], width = 1000, height = 300)
     .join(" ");
   return (
     <svg width={width} height={height} style={{ display: "block" }}>
-      <path d={d} fill="none" stroke="#22d3ee" strokeWidth={6} />
+      <path d={d} fill="none" stroke={stroke} strokeWidth={6} />
     </svg>
   );
 }
@@ -60,7 +62,7 @@ function renderSparkline(points: [number, number][], width = 1000, height = 300)
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
-  const days = Number(searchParams.get("days") || 7);
+  const days = Number(searchParams.get("days") || RANDOM_COIN_CHART_DAYS);
   if (!id) {
     return new ImageResponse(
       (
@@ -73,17 +75,26 @@ export async function GET(req: Request) {
   }
 
   try {
-    const apiKey = process.env.COINGECKO_DEMO_API_KEY ?? process.env.COINGECKO_API_KEY;
-    const [details, chart] = await Promise.all([
-      fetchCoinDetails(id, apiKey),
-      fetchCoinMarketChart(id, days, apiKey),
-    ]);
+    let details, chart;
+    if (id === "__cached__") {
+      const payload = await getOrRefreshRandomCoinPayload();
+      if (!payload) throw new Error("Failed to load cached random coin payload");
+      details = payload.details;
+      chart = payload.chart;
+    } else {
+      const apiKey = process.env.COINGECKO_DEMO_API_KEY ?? process.env.COINGECKO_API_KEY;
+      [details, chart] = await Promise.all([
+        fetchCoinDetails(id, apiKey),
+        fetchCoinMarketChart(id, days, apiKey),
+      ]);
+    }
 
     const price = details.market_data?.current_price?.usd;
     const marketCap = details.market_data?.market_cap?.usd;
     const name = details.name;
     const symbol = details.symbol?.toUpperCase();
     const image = details.image?.large || details.image?.small || details.image?.thumb;
+    const color = details.color || "#0ea5e9"; // default teal-ish if none
 
     return new ImageResponse(
       (
@@ -94,12 +105,14 @@ export async function GET(req: Request) {
             display: "flex",
             flexDirection: "column",
             padding: 48,
-            background: "#0b0d10",
-            color: "white",
+            background: "#ffffff",
+            color: "#0b0d10",
             gap: 24,
             fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto",
           }}
         >
+          {/* Unsafe margins for clients that crop ~10% left/right */}
+          <div style={{ width: "100%", height: 0, display: "flex" }} />
           <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
             {image ? (
               <img
@@ -107,33 +120,33 @@ export async function GET(req: Request) {
                 width={96}
                 height={96}
                 alt={name}
-                style={{ borderRadius: 16, background: "#111", display: "flex" }}
+                style={{ borderRadius: 16, background: "#f0f3f7", display: "flex" }}
               />
             ) : null}
             <div style={{ display: "flex", flexDirection: "column" }}>
               <div style={{ display: "flex", fontSize: 48, fontWeight: 700 }}>{name}</div>
-              <div style={{ display: "flex", fontSize: 28, color: "#9ca3af" }}>{symbol}</div>
+              <div style={{ display: "flex", fontSize: 28, color: "#6b7280" }}>{symbol}</div>
             </div>
             <div style={{ marginLeft: "auto", textAlign: "right", display: "flex", flexDirection: "column" }}>
               <div style={{ display: "flex", fontSize: 40, fontWeight: 700 }}>{formatUsd(price)}</div>
-              <div style={{ display: "flex", fontSize: 24, color: "#9ca3af" }}>Market Cap {formatUsdAbbrev(marketCap)}</div>
+              <div style={{ display: "flex", fontSize: 24, color: "#6b7280" }}>Market Cap {formatUsdAbbrev(marketCap)}</div>
             </div>
           </div>
           <div
             style={{
               borderRadius: 24,
-              background: "#0f141a",
+              background: "#f5f7fb",
               padding: 24,
               display: "flex",
               flexDirection: "column",
               gap: 16,
             }}
           >
-            <div style={{ display: "flex", fontSize: 24, color: "#9ca3af" }}>{days}d price</div>
-            <div style={{ display: "flex" }}>{renderSparkline(chart.prices, 1104, 360)}</div>
+            <div style={{ display: "flex", fontSize: 24, color: "#6b7280" }}>{days}d price</div>
+            <div style={{ display: "flex" }}>{renderSparkline(chart.prices, 1104, 360, color)}</div>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ display: "flex", fontSize: 24, color: "#9ca3af" }}>
+            <div style={{ display: "flex", fontSize: 24, color: "#6b7280" }}>
               Powered by CoinGecko • Generated on Vercel
             </div>
           </div>
